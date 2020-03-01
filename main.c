@@ -8,7 +8,7 @@
 #include "defs.h"
 #include "RNG.h"
 #define NBLOCKS 8
-#define NBYTES 100
+#define NBYTES 128
 #define NBYTES_REALLOC 138
 struct block_alloc_t {
 	void*addr;
@@ -120,8 +120,8 @@ int get_valid_block_amount(void)
 
 int main(int argc, char **argv)
 {
-	//specific_test();
-	rand_test();
+	specific_test();
+	//rand_test();
 }
 void specific_test(void)
 {
@@ -132,7 +132,7 @@ void specific_test(void)
 	alloc_blks();
 	pr_blks();
 	// fill with rand
-	set_all_rand_values();
+	//set_all_rand_values();
 	// calc checksums for fulfilled blks
 	calc_allchksums();
 	if(get_valid_block_amount() == 0)

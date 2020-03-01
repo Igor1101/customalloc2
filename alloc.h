@@ -20,7 +20,8 @@
 #define PG_HALF_SIZE ((PG_SIZE)>>1)
 #define ALIGNMENT 4 // must be a power of 2
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
-
+#define BLK_START(X) ((X)+ALIGN(sizeof(blk_t)))
+#define BLK_HEADER(X) ((X)-ALIGN(sizeof(blk_t)))
 typedef enum {
 	pg_free = 0,
 	pg_multiblk,

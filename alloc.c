@@ -47,6 +47,9 @@ blk_t* get_freeblk_pg(int pgnum);
  * if no such block is found returns NULL
  */
 blk_t* get_nextblk(blk_t* blk, int pgnum);
+int get_pg_region(void*addr);
+blk_t* get_blk_region(void*addr, int pgnum);
+bool busy_region(void*addr);
 /************end  local functions*******************/
 
 /*
@@ -163,7 +166,7 @@ blk_t* get_nextblk(blk_t* blk, int pgnum)
 	if(pgs[pgnum].st != pg_multiblk)
 		return NULL;
 	uint8_t* nxt = ((uint8_t*)blk + blk->nxtblk + ALIGN(sizeof(blk_t)));
-	if(nxt < &array[(pgnum+1)*PG_SIZE] && nxt > &array[(pgnum)*PG_SIZE]) {
+	if(BLK_START(nxt) + blk->nxtblk < &array[(pgnum+1)*PG_SIZE] && nxt > &array[(pgnum)*PG_SIZE]) {
 		return (blk_t*)nxt;
 	}
 	return NULL;
@@ -193,10 +196,42 @@ void *mem_alloc(size_t size)
 			assert(!blk->busy);
 			blk->busy = true;
 			pgs[pgnum].firstfreeblk = get_freeblk_pg(pgnum);
+			return BLK_START(blk);
 		}
-		return blk;
 	}
 	return NULL;
+}
+
+int get_pg_region(void*addr)
+{
+	for(int pg=0; pg<PG_AMOUNT; pg++) {
+		if((uint8_t*)addr < &array[pg*PG_SIZE] &&
+				(uint8_t*)addr >= &array[(pg-1)*PG_SIZE]) {
+			return pg-1;
+		}
+	}
+	return -1;
+}
+
+blk_t* get_blk_region(void*addr, int pgnum)
+{
+	for(blk_t* b=(blk_t*)&array[pgnum*PG_SIZE]; b!=NULL;) {
+		if(addr >= (void*)b && addr < BLK_START((void*)b) + b->nxtblk) {
+			return b;
+		}
+		b = get_nextblk(b, pgnum);
+	}
+	return NULL;
+}
+bool busy_region(void*addr)
+{
+	int pg = get_pg_region(addr);
+	blk_t*b = get_blk_region(addr, pg);
+	if(b == NULL) {
+		pr_err("busy_region(): request out of region");
+		return false;
+	}
+	return b->busy;
 }
 
 void *mem_realloc(void *addr, size_t size)
@@ -210,8 +245,25 @@ void mem_free(void *addr)
 void mem_init(void);
 void mem_dump(void)
 {
+	pr_info("\tmem dump:");
+	const int chperpg = 80;
+	const int bperchar = PG_SIZE / chperpg;
 	// pgs
 	for(int pg=0; pg<PG_AMOUNT; pg++) {
 		//blocks
+		printf("[%i]\t", pg);
+		blk_t* prev;
+		for(uint8_t* addr=&array[pg*PG_SIZE];
+				addr < &array[(pg+1)*PG_SIZE]; addr += bperchar) {
+			blk_t*blk = get_blk_region(addr, pg);
+			if(blk == NULL)
+				putchar('?');
+			else if(blk != prev)
+				putchar('!');
+			else
+				putchar(busy_region(addr)? '#':'-');
+			prev = blk;
+		}
+		puts("");
 	}
 }
