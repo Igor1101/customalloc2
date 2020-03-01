@@ -125,6 +125,24 @@ bool init_pg_multiblk(int pgnum, size_t size)
 	}
 	return true;
 }
+/*
+ * returns first free blk, if not found return is NULL
+ */
+blk_t* get_freeblk_pg(int pgnum)
+{
+	pg_t *pg = &pgs[pgnum];
+	// verify if its applicable
+	if(pg->st != pg_multiblk)
+		return NULL;
+	uint8_t*iblk = &array[pgnum*PG_SIZE];
+	for(; iblk < &array[(pgnum+1)*PG_SIZE];) {
+		if(!((blk_t*)iblk)->busy)
+			return (blk_t*)iblk;
+		// goto next
+		iblk = iblk + ((blk_t*)iblk)->nxtblk + ALIGN(sizeof(blk_t));
+	}
+	return NULL;
+}
 /* visible functions */
 void *mem_alloc(size_t size)
 {
@@ -145,9 +163,12 @@ void *mem_alloc(size_t size)
 		}
 		// get first free blk from this page
 		blk_t* blk = pgs[pgnum].firstfreeblk;
-		assert(!blk->busy);
-		blk->busy = true;
-		pgs[pgnum].firstfreeblk = (blk_t*)((uint8_t*)blk + blk->nxtblk + ALIGN(sizeof(blk_t)));
+		// NULL means no free blk
+		if(blk != NULL) {
+			assert(!blk->busy);
+			blk->busy = true;
+			pgs[pgnum].firstfreeblk = get_freeblk_pg(pgnum);
+		}
 		return blk;
 	}
 	return NULL;
