@@ -38,6 +38,15 @@ bool init_pg_multiblk(int pgnum, size_t size);
  * init pgs with huge blk
  */
 bool init_pgs_singleblk(int pgnum, size_t size);
+/*
+ * returns first free blk, if not found return is NULL
+ */
+blk_t* get_freeblk_pg(int pgnum);
+/*
+ * returns next block inside current page
+ * if no such block is found returns NULL
+ */
+blk_t* get_nextblk(blk_t* blk, int pgnum);
 /************end  local functions*******************/
 
 /*
@@ -115,13 +124,13 @@ bool init_pg_multiblk(int pgnum, size_t size)
 	pgs[pgnum].st = pg_multiblk;
 	pgs[pgnum].blkinfo.size = size;
 	pgs[pgnum].firstfreeblk = (blk_t*)&array[pgnum*PG_SIZE];
-	uint8_t* iblk = &array[pgnum*PG_SIZE];
+	blk_t* iblk = (blk_t*)&array[pgnum*PG_SIZE];
 	// fill blk info
-	for(; iblk < &array[(pgnum+1)*PG_SIZE];) {
-		((blk_t*)iblk)->busy = false;
-		((blk_t*)iblk)->nxtblk = size;
+	while(iblk != NULL) {
+		iblk->busy = false;
+		iblk->nxtblk = size;
 		// goto next
-		iblk = iblk + ((blk_t*)iblk)->nxtblk + ALIGN(sizeof(blk_t));
+		iblk = get_nextblk(iblk, pgnum);
 	}
 	return true;
 }
@@ -134,12 +143,28 @@ blk_t* get_freeblk_pg(int pgnum)
 	// verify if its applicable
 	if(pg->st != pg_multiblk)
 		return NULL;
-	uint8_t*iblk = &array[pgnum*PG_SIZE];
-	for(; iblk < &array[(pgnum+1)*PG_SIZE];) {
-		if(!((blk_t*)iblk)->busy)
-			return (blk_t*)iblk;
+	blk_t*iblk = (blk_t*)&array[pgnum*PG_SIZE];
+	while(iblk != NULL) {
+		if(!iblk->busy)
+			return iblk;
 		// goto next
-		iblk = iblk + ((blk_t*)iblk)->nxtblk + ALIGN(sizeof(blk_t));
+		iblk = get_nextblk(iblk, pgnum);
+	}
+	return NULL;
+}
+
+/*
+ * returns next block inside current page
+ * if no such block is found returns NULL
+ */
+blk_t* get_nextblk(blk_t* blk, int pgnum)
+{
+	// if not applicable
+	if(pgs[pgnum].st != pg_multiblk)
+		return NULL;
+	uint8_t* nxt = ((uint8_t*)blk + blk->nxtblk + ALIGN(sizeof(blk_t)));
+	if(nxt < &array[(pgnum+1)*PG_SIZE] && nxt > &array[(pgnum)*PG_SIZE]) {
+		return (blk_t*)nxt;
 	}
 	return NULL;
 }
@@ -185,5 +210,8 @@ void mem_free(void *addr)
 void mem_init(void);
 void mem_dump(void)
 {
-
+	// pgs
+	for(int pg=0; pg<PG_AMOUNT; pg++) {
+		//blocks
+	}
 }
