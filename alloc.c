@@ -310,19 +310,28 @@ void mem_dump(void)
 	// pgs
 	for(int pg=0; pg<PG_AMOUNT; pg++) {
 		//blocks
-		printf("[%i] addr=0x%04x\t", pg, &array[pg*PG_SIZE]);
+		printf("[%i] addr=0x%04x\t%%", pg, &array[pg*PG_SIZE]);
 		blk_t* prev;
-		for(uint8_t* addr=&array[pg*PG_SIZE];
+		switch(pgs[pg].st) {
+		case pg_free:
+			for(uint8_t* addr=&array[pg*PG_SIZE];
 				addr < &array[(pg+1)*PG_SIZE]; addr += bperchar) {
-			blk_t*blk = get_blk_region(addr, pg);
-			if(blk == NULL)
-				putchar('?');
-			else if(blk != prev)
-				putchar('!');
-			else
-				putchar(busy_region(addr)? '#':'-');
-			prev = blk;
+				putchar(' ');
+			}
+			break;
+		case pg_multiblk:
+			for(uint8_t* addr=&array[pg*PG_SIZE];
+					addr < &array[(pg+1)*PG_SIZE]; addr += bperchar) {
+				blk_t*blk = get_blk_region(addr, pg);
+				if(blk == NULL)
+					putchar('?');
+				else if(blk != prev)
+					putchar('!');
+				else
+					putchar(busy_region(addr)? '#':'-');
+				prev = blk;
+			}
 		}
-		puts("");
+		puts("%");
 	}
 }

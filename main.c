@@ -146,6 +146,10 @@ void specific_test(void)
 	free_blk(5);
 	pr_blks();
 	mem_dump();
+	pr_info("allocating back");
+	alloc_blks();
+	pr_blks();
+	mem_dump();
 	// realloc some rand blks:
 	pr_info("Reallocating some blks");
 
@@ -154,7 +158,10 @@ void specific_test(void)
 	realloc_blk(0);
 	mem_dump();
 	pr_blks();
+	pr_info("freeing all blks");
 	free_all_blks();
+	mem_dump();
+	pr_blks();
 }
 
 void rand_test(void)
