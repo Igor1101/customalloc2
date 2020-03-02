@@ -20,8 +20,9 @@
 #define PG_HALF_SIZE ((PG_SIZE)>>1)
 #define ALIGNMENT 4 // must be a power of 2
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
-#define BLK_START(X) ((X)+ALIGN(sizeof(blk_t)))
-#define BLK_HEADER(X) ((X)-ALIGN(sizeof(blk_t)))
+#define BLK_ADDITIONAL_OFFS	0
+#define BLK_START(X) (((uint8_t*)(X))+ALIGN(sizeof(blk_t)))
+#define BLK_HEADER(X) (((uint8_t*)(X))-ALIGN(sizeof(blk_t)))
 typedef enum {
 	pg_free = 0,
 	pg_multiblk,
@@ -44,6 +45,7 @@ typedef struct {
 typedef struct {
 	union size_u blkinfo;
 	blk_t* firstfreeblk;
+	int freeblkamount;
 	pg_blkstate_t st:2;
 } pg_t;
 

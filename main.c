@@ -26,8 +26,9 @@ void alloc_blks(void)
 	for(int i=0; i<NBLOCKS; i++) {
 		// allocate only not allocated before
 		if(blks[i].valid == false) {
-			blks[i].addr = mem_alloc(NBYTES);
-			blks[i].size = NBYTES;
+			size_t sz = (i%3+1)*NBYTES;
+			blks[i].addr = mem_alloc(sz);
+			blks[i].size = sz;
 			// set validity
 			if(blks[i].addr != NULL)
 				blks[i].valid = true;
@@ -132,7 +133,7 @@ void specific_test(void)
 	alloc_blks();
 	pr_blks();
 	// fill with rand
-	//set_all_rand_values();
+	set_all_rand_values();
 	// calc checksums for fulfilled blks
 	calc_allchksums();
 	if(get_valid_block_amount() == 0)

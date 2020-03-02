@@ -33,23 +33,26 @@ static int get_pgs_free(int amount);
 /*
  * init pg with small blks
  */
-bool init_pg_multiblk(int pgnum, size_t size);
+static bool init_pg_multiblk(int pgnum, size_t size);
 /*
  * init pgs with huge blk
  */
-bool init_pgs_singleblk(int pgnum, size_t size);
+static bool init_pgs_singleblk(int pgnum, size_t size);
 /*
  * returns first free blk, if not found return is NULL
  */
-blk_t* get_freeblk_pg(int pgnum);
+static blk_t* get_freeblk_pg(int pgnum);
 /*
  * returns next block inside current page
  * if no such block is found returns NULL
  */
-blk_t* get_nextblk(blk_t* blk, int pgnum);
-int get_pg_region(void*addr);
-blk_t* get_blk_region(void*addr, int pgnum);
-bool busy_region(void*addr);
+static blk_t* get_nextblk(blk_t* blk, int pgnum);
+static int get_pg_region(void*addr);
+static blk_t* get_blk_region(void*addr, int pgnum);
+static bool busy_region(void*addr);
+static int get_amount_freeblk_pg(int pg);
+static int get_amount_blk_pg(int pg);
+static void pg_refresh_blkinfo(int pgnum);
 /************end  local functions*******************/
 
 /*
@@ -86,12 +89,15 @@ static size_t calc_blk_class(size_t sz)
 }
 /*
  * return num of page with class specified,
- * if not found return -1
+ * if not found return -1,
+ * page must have at least 1 free block
  */
 static int get_pg_class(size_t size)
 {
 	for(int i=0; i<PG_AMOUNT; i++) {
-		if(pgs[i].st == pg_multiblk && pgs[i].blkinfo.size == size) {
+		if(pgs[i].st == pg_multiblk &&
+				pgs[i].blkinfo.size == size&&
+				pgs[i].freeblkamount > 0) {
 			return i;
 		}
 	}
@@ -118,7 +124,29 @@ static int get_pgs_free(int amount)
 	return -1;
 }
 
-bool init_pg_multiblk(int pgnum, size_t size)
+static int get_amount_freeblk_pg(int pg)
+{
+	int num = 0;
+	for(blk_t*blk = (blk_t*)&array[pg*PG_SIZE]; blk != NULL;) {
+		if(!blk->busy)
+			num++;
+		blk = get_nextblk(blk, pg);
+	}
+	return num;
+}
+
+
+static int get_amount_blk_pg(int pg)
+{
+	int num = 0;
+	for(blk_t*blk = (blk_t*)&array[pg*PG_SIZE]; blk != NULL;) {
+		num++;
+		blk = get_nextblk(blk, pg);
+	}
+	return num;
+}
+
+static bool init_pg_multiblk(int pgnum, size_t size)
 {
 	if(pgs[pgnum].st != pg_free ||
 			size > PG_HALF_SIZE || pgnum > PG_AMOUNT) {
@@ -135,12 +163,14 @@ bool init_pg_multiblk(int pgnum, size_t size)
 		// goto next
 		iblk = get_nextblk(iblk, pgnum);
 	}
+	// save info about free blks
+	pgs[pgnum].freeblkamount = get_amount_freeblk_pg(pgnum);
 	return true;
 }
 /*
  * returns first free blk, if not found return is NULL
  */
-blk_t* get_freeblk_pg(int pgnum)
+static blk_t* get_freeblk_pg(int pgnum)
 {
 	pg_t *pg = &pgs[pgnum];
 	// verify if its applicable
@@ -160,7 +190,7 @@ blk_t* get_freeblk_pg(int pgnum)
  * returns next block inside current page
  * if no such block is found returns NULL
  */
-blk_t* get_nextblk(blk_t* blk, int pgnum)
+static blk_t* get_nextblk(blk_t* blk, int pgnum)
 {
 	// if not applicable
 	if(pgs[pgnum].st != pg_multiblk)
@@ -195,14 +225,26 @@ void *mem_alloc(size_t size)
 		if(blk != NULL) {
 			assert(!blk->busy);
 			blk->busy = true;
-			pgs[pgnum].firstfreeblk = get_freeblk_pg(pgnum);
+			// because changing block info we need to update page info
+			pg_refresh_blkinfo(pgnum);
 			return BLK_START(blk);
 		}
 	}
 	return NULL;
 }
 
-int get_pg_region(void*addr)
+static void pg_refresh_blkinfo(int pgnum)
+{
+	assert(pgnum >= 0);
+	pgs[pgnum].firstfreeblk = get_freeblk_pg(pgnum);
+	pgs[pgnum].freeblkamount = get_amount_freeblk_pg(pgnum);
+	if(pgs[pgnum].freeblkamount == get_amount_blk_pg(pgnum)) {
+		// set pg state to abs free
+		pgs[pgnum].st = pg_free;
+	}
+}
+
+static int get_pg_region(void*addr)
 {
 	for(int pg=0; pg<PG_AMOUNT; pg++) {
 		if((uint8_t*)addr < &array[pg*PG_SIZE] &&
@@ -213,17 +255,17 @@ int get_pg_region(void*addr)
 	return -1;
 }
 
-blk_t* get_blk_region(void*addr, int pgnum)
+static blk_t* get_blk_region(void*addr, int pgnum)
 {
 	for(blk_t* b=(blk_t*)&array[pgnum*PG_SIZE]; b!=NULL;) {
-		if(addr >= (void*)b && addr < BLK_START((void*)b) + b->nxtblk) {
+		if(addr >= (void*)b && (uint8_t*)addr < BLK_START(b) + b->nxtblk) {
 			return b;
 		}
 		b = get_nextblk(b, pgnum);
 	}
 	return NULL;
 }
-bool busy_region(void*addr)
+static bool busy_region(void*addr)
 {
 	int pg = get_pg_region(addr);
 	blk_t*b = get_blk_region(addr, pg);
@@ -240,7 +282,24 @@ void *mem_realloc(void *addr, size_t size)
 }
 void mem_free(void *addr)
 {
-
+	int pg = get_pg_region(addr);
+	if(pg < 0 || pgs[pg].st == pg_free) {
+		pr_err("invalid mem_free() call");
+		return;
+	}
+	blk_t* b = get_blk_region(addr, pg);
+	assert(b != NULL);
+	if(!b->busy) {
+		pr_err("invalid mem_free() call, blk was already free");
+		return;
+	}
+	if(pgs[pg].st == pg_singleblk) {
+		// TODO
+	} else if(pgs[pg].st == pg_multiblk) {
+		b->busy = false;
+		// we need to update this page info
+		pg_refresh_blkinfo(pg);
+	}
 }
 void mem_init(void);
 void mem_dump(void)
@@ -251,7 +310,7 @@ void mem_dump(void)
 	// pgs
 	for(int pg=0; pg<PG_AMOUNT; pg++) {
 		//blocks
-		printf("[%i]\t", pg);
+		printf("[%i] addr=0x%04x\t", pg, &array[pg*PG_SIZE]);
 		blk_t* prev;
 		for(uint8_t* addr=&array[pg*PG_SIZE];
 				addr < &array[(pg+1)*PG_SIZE]; addr += bperchar) {
