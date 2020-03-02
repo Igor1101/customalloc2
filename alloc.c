@@ -53,6 +53,9 @@ static bool busy_region(void*addr);
 static int get_amount_freeblk_pg(int pg);
 static int get_amount_blk_pg(int pg);
 static void pg_refresh_blkinfo(int pgnum);
+// alloc funs
+static void *alloc_multiblk(size_t size);
+static void* alloc_singleblk(pg_t pg);
 /************end  local functions*******************/
 
 /*
@@ -201,34 +204,61 @@ static blk_t* get_nextblk(blk_t* blk, int pgnum)
 	}
 	return NULL;
 }
-/* visible functions */
+static void *alloc_multiblk(size_t size)
+{
+	// find 1st page with the same size class
+	int pgnum = get_pg_class(size);
+	if(pgnum < 0) {
+		// not found such page, getting new one
+		pgnum = get_pgs_free(1);
+		if(pgnum < 0) {
+			// this means no such pgs available
+			return NULL;
+		}
+		// initialize new page
+		assert(init_pg_multiblk(pgnum, size));
+	}
+	// get first free blk from this page
+	blk_t* blk = pgs[pgnum].firstfreeblk;
+	// NULL means no free blk
+	if(blk != NULL) {
+		assert(!blk->busy);
+		blk->busy = true;
+		// because changing block info we need to update page info
+		pg_refresh_blkinfo(pgnum);
+		return BLK_START(blk);
+	}
+	return NULL;
+}
+
+static void* alloc_singleblk(pg_t pg)
+{
+	assert(pg.st == pg_singleblk);
+	int pgstart = get_pgs_free(pg.blkinfo.pgsamount);
+	if(pgstart < 0)
+		return NULL;
+	// now make new blk inside these pages
+	// firstly mark 1st page for this blk
+	blk_t*b = (blk_t*)&array[pgstart*PG_SIZE];
+	b->busy = true;
+	b->nxtblk = PG_SIZE*pg.blkinfo.pgsamount;
+	pgs[pgstart] = pg;
+	pgs[pgstart].firstfreeblk = NULL;
+	// fill other pages
+	for(int i=pgstart; i<pgstart+pg.blkinfo.pgsamount; i++) {
+		pgs[i].st = pg_sintermediate;
+	}
+	pgs[pgstart].st = pg_singleblk;
+	return BLK_START(b);
+}
 void *mem_alloc(size_t size)
 {
 	pg_t likelypg = calc_pg_blk(size);
-	int pgnum;
-	if(likelypg.st == pg_multiblk) {
-		// find 1st page with the same size class
-		pgnum = get_pg_class(size);
-		if(pgnum < 0) {
-			// not found such page, getting new one
-			pgnum = get_pgs_free(1);
-			if(pgnum < 0) {
-				// this means no such pgs available
-				return NULL;
-			}
-			// initialize new page
-			assert(init_pg_multiblk(pgnum, size));
-		}
-		// get first free blk from this page
-		blk_t* blk = pgs[pgnum].firstfreeblk;
-		// NULL means no free blk
-		if(blk != NULL) {
-			assert(!blk->busy);
-			blk->busy = true;
-			// because changing block info we need to update page info
-			pg_refresh_blkinfo(pgnum);
-			return BLK_START(blk);
-		}
+	switch(likelypg.st) {
+	case pg_multiblk:
+		return alloc_multiblk(size);
+	case pg_singleblk:
+		return alloc_singleblk(likelypg);
 	}
 	return NULL;
 }
@@ -319,6 +349,13 @@ void mem_dump(void)
 				putchar(' ');
 			}
 			break;
+		case pg_sintermediate:
+			for(uint8_t* addr=&array[pg*PG_SIZE];
+				addr < &array[(pg+1)*PG_SIZE]; addr += bperchar) {
+				putchar('#');
+			}
+			break;
+		case pg_singleblk:
 		case pg_multiblk:
 			for(uint8_t* addr=&array[pg*PG_SIZE];
 					addr < &array[(pg+1)*PG_SIZE]; addr += bperchar) {
