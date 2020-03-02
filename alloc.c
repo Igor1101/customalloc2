@@ -323,19 +323,34 @@ void mem_free(void *addr)
 		pr_err("invalid mem_free() call, blk was already free");
 		return;
 	}
-	if(pgs[pg].st == pg_singleblk) {
-		// TODO
-	} else if(pgs[pg].st == pg_multiblk) {
-		b->busy = false;
-		// we need to update this page info
-		pg_refresh_blkinfo(pg);
+	switch(pgs[pg].st) {
+	case pg_singleblk:
+		free_single(b, pg);
+		break;
+	case pg_multiblk:
+		free_multiple(b, pg);
+		break;
 	}
+}
+
+void free_single(blk_t*b, int pg)
+{
+	b->busy = false;
+	pgs[pg].st = pg_free;
+	for(int i=pg; i<pg+pgs[pg].blkinfo.pgsamount; i++) {
+		pgs[i].st = pg_free;
+	}
+}
+void free_multiple(blk_t*b, int pg)
+{
+	b->busy = false;
+	pg_refresh_blkinfo(pg);
 }
 void mem_init(void);
 void mem_dump(void)
 {
 	pr_info("\tmem dump:");
-	const int chperpg = 80;
+	const int chperpg = 120;
 	const int bperchar = PG_SIZE / chperpg;
 	// pgs
 	for(int pg=0; pg<PG_AMOUNT; pg++) {
