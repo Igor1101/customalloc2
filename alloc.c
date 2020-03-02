@@ -74,9 +74,9 @@ static pg_t calc_pg_blk(size_t sz)
 		// if not so determine amount of pgs for such blk
 		pg.st = pg_singleblk;
 		// determine amount of pages
-		pg.blkinfo.pgsamount = sz / PG_SIZE;
+		pg.blkinfo.pgsamount = (sz+ALIGN(sizeof(blk_t)) )/ PG_SIZE;
 		// add remainder(1 page) if needed
-		pg.blkinfo.pgsamount += ((sz % PG_SIZE) > 0) ? 1 : 0;
+		pg.blkinfo.pgsamount += (((sz + ALIGN(sizeof(blk_t))) % PG_SIZE) > 0) ? 1 : 0;
 	}
 	return pg;
 }
