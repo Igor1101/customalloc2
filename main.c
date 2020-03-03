@@ -127,8 +127,8 @@ int get_valid_block_amount(void)
 
 int main(int argc, char **argv)
 {
-	specific_test();
-	//rand_test();
+	//specific_test();
+	rand_test();
 }
 void specific_test(void)
 {
@@ -192,6 +192,7 @@ void rand_test(void)
 		if(blks[new_fr].valid) {
 			i++;
 			free_blk(new_fr);
+			pr_info("freed:blk=%d", new_fr);
 		}
 	}
 	pr_blks();
@@ -204,10 +205,10 @@ void rand_test(void)
 			pr_info("blk=%d", blk);
 			i++;
 			int size_before = blks[blk].size;
-			void*addr = mem_realloc(blks[blk].addr, NBYTES_REALLOC);
+			void*addr = mem_realloc(blks[blk].addr, size_before*2);
 			if(addr != NULL) {
 				blks[blk].addr = addr;
-				blks[blk].size = NBYTES_REALLOC;
+				blks[blk].size = size_before*2;
 
 				if(crc32(0, blks[blk].addr, size_before) != blks[blk].chksum) {
 					pr_err("CRC err, blk=%d", blk);
