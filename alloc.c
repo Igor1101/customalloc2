@@ -61,6 +61,7 @@ static void free_single(blk_t*b, int pg);
 static void free_multiple(blk_t*b, int pg);
 // realloc
 static void* realloc_multiblk(int pg, blk_t*blk, size_t size);
+static void* realloc_singleblk(int pg, blk_t*blk, size_t size);
 /************end  local functions*******************/
 
 /*
@@ -270,7 +271,7 @@ static void* alloc_singleblk(pg_t pg)
 	// firstly mark 1st page for this blk
 	blk_t*b = (blk_t*)&array[pgstart*PG_SIZE];
 	b->busy = true;
-	b->nxtblk = PG_SIZE*pg.blkinfo.pgsamount;
+	b->nxtblk = PG_SIZE*pg.blkinfo.pgsamount - ALIGN(sizeof(blk_t));
 	assert(init_pgs_singleblk(pgstart, pg));
 	return BLK_START(b);
 }
@@ -345,6 +346,8 @@ void *mem_realloc(void *addr, size_t size)
 	switch(pgs[pg].st) {
 	case pg_multiblk:
 		return realloc_multiblk(pg, b, size);
+	case pg_singleblk:
+		return realloc_singleblk(pg, b, size);
 	default:
 		return NULL;
 	}
@@ -366,6 +369,15 @@ static void* realloc_multiblk(int pg, blk_t*blk, size_t size)
 	memmove(newaddr, BLK_START(blk), oldsz);
 	mem_free(blk);
 	return newaddr;
+}
+
+static void* realloc_singleblk(int pg, blk_t*blk, size_t size)
+{
+	if(blk->nxtblk >= size) {
+		// nothing to do
+		return BLK_START(blk);
+	}
+	return NULL;
 }
 void mem_free(void *addr)
 {
