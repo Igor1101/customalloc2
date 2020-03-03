@@ -58,8 +58,10 @@ void realloc_blk(int num)
 	if(addr != NULL) {
 		blks[num].addr = addr;
 		blks[num].size = NBYTES_REALLOC;
-		if(crc32(0, blks[num].addr, size_before) != blks[num].chksum) {
-			pr_err("CRC err, blk=%d", num);
+		if(size_before < blks[num].size) {
+			if(crc32(0, blks[num].addr, size_before) != blks[num].chksum) {
+				pr_err("CRC err, blk=%d", num);
+			}
 		}
 		blks[num].chksum = crc32(0, blks[num].addr, blks[num].size);
 	} else {
@@ -150,10 +152,10 @@ void specific_test(void)
 	free_blk(5);
 	pr_blks();
 	mem_dump();
-	pr_info("allocating back");
-	alloc_blks();
-	pr_blks();
-	mem_dump();
+	//pr_info("allocating back");
+	//alloc_blks();
+	//pr_blks();
+	//mem_dump();
 	// realloc some rand blks:
 	pr_info("Reallocating some blks");
 

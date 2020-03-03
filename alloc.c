@@ -57,8 +57,10 @@ static void pg_refresh_blkinfo(int pgnum);
 static void *alloc_multiblk(size_t size);
 static void* alloc_singleblk(pg_t pg);
 // freeing
-void free_single(blk_t*b, int pg);
-void free_multiple(blk_t*b, int pg);
+static void free_single(blk_t*b, int pg);
+static void free_multiple(blk_t*b, int pg);
+// realloc
+static void* realloc_multiblk(int pg, blk_t*blk, size_t size);
 /************end  local functions*******************/
 
 /*
@@ -329,13 +331,47 @@ static bool busy_region(void*addr)
 
 void *mem_realloc(void *addr, size_t size)
 {
-	return NULL;
+	int pg = get_pg_region(addr);
+	if(pg < 0 || pgs[pg].st == pg_free) {
+		pr_err("invalid mem_realloc() call, pg is free or do not exist");
+		return NULL;
+	}
+	blk_t* b = get_blk_region(addr, pg);
+	assert(b != NULL);
+	if(!b->busy) {
+		pr_err("invalid mem_realloc() call, blk is free");
+		return NULL;
+	}
+	switch(pgs[pg].st) {
+	case pg_multiblk:
+		return realloc_multiblk(pg, b, size);
+	default:
+		return NULL;
+	}
+}
+
+static void* realloc_multiblk(int pg, blk_t*blk, size_t size)
+{
+	if(blk->nxtblk >= size) {
+		// nothing to do
+		return BLK_START(blk);
+	}
+	// otherwise get new blk
+	void* newaddr = mem_alloc(size);
+	if(newaddr == NULL) {
+		pr_err("not enough memory to realloc");
+		return NULL;
+	}
+	size_t oldsz = blk->nxtblk;
+	memmove(newaddr, BLK_START(blk), oldsz);
+	mem_free(blk);
+	return newaddr;
 }
 void mem_free(void *addr)
 {
 	int pg = get_pg_region(addr);
 	if(pg < 0 || pgs[pg].st == pg_free) {
-		pr_err("invalid mem_free() call");
+		pr_err("invalid mem_free() call, pg is free or do not exist");
 		return;
 	}
 	blk_t* b = get_blk_region(addr, pg);
@@ -354,14 +390,14 @@ void mem_free(void *addr)
 	}
 }
 
-void free_single(blk_t*b, int pg)
+static void free_single(blk_t*b, int pg)
 {
 	b->busy = false;
 	for(int i=pg; i<pg+pgs[pg].blkinfo.pgsamount; i++) {
 		pgs[i].st = pg_free;
 	}
 }
-void free_multiple(blk_t*b, int pg)
+static void free_multiple(blk_t*b, int pg)
 {
 	b->busy = false;
 	pg_refresh_blkinfo(pg);

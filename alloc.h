@@ -14,7 +14,7 @@
 /****** settings **********/
 // must be 2*P
 #define PG_SIZE 1024
-#define PG_AMOUNT 8
+#define PG_AMOUNT 16
 /**************************/
 // definitions, macro
 #define PG_HALF_SIZE ((PG_SIZE)>>1)
