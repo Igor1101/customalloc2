@@ -28,7 +28,9 @@ void alloc_blks(void)
 		if(blks[i].valid == false) {
 			size_t sz = (i%3+1)*NBYTES;
 			if(i==1)
-				sz = 1024*3;
+				sz = 1024*2;
+			if(i==2)
+				sz = 1024*2;
 			blks[i].addr = mem_alloc(sz);
 			blks[i].size = sz;
 			// set validity

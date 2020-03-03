@@ -56,6 +56,9 @@ static void pg_refresh_blkinfo(int pgnum);
 // alloc funs
 static void *alloc_multiblk(size_t size);
 static void* alloc_singleblk(pg_t pg);
+// freeing
+void free_single(blk_t*b, int pg);
+void free_multiple(blk_t*b, int pg);
 /************end  local functions*******************/
 
 /*
@@ -277,9 +280,9 @@ static void pg_refresh_blkinfo(int pgnum)
 static int get_pg_region(void*addr)
 {
 	for(int pg=0; pg<PG_AMOUNT; pg++) {
-		if((uint8_t*)addr < &array[pg*PG_SIZE] &&
-				(uint8_t*)addr >= &array[(pg-1)*PG_SIZE]) {
-			return pg-1;
+		if((uint8_t*)addr < &array[(pg+1)*PG_SIZE] &&
+				(uint8_t*)addr >= &array[(pg)*PG_SIZE]) {
+			return pg;
 		}
 	}
 	return -1;
@@ -336,7 +339,6 @@ void mem_free(void *addr)
 void free_single(blk_t*b, int pg)
 {
 	b->busy = false;
-	pgs[pg].st = pg_free;
 	for(int i=pg; i<pg+pgs[pg].blkinfo.pgsamount; i++) {
 		pgs[i].st = pg_free;
 	}
