@@ -39,7 +39,7 @@ union size_u {
 };
 
 typedef struct {
-	size_t nxtblk;
+	size_t nxtblk:14;
 	bool busy:1;
 } blk_t;
 typedef struct {

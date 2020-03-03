@@ -127,8 +127,8 @@ int get_valid_block_amount(void)
 
 int main(int argc, char **argv)
 {
-	//specific_test();
-	rand_test();
+	specific_test();
+	//rand_test();
 }
 void specific_test(void)
 {
@@ -146,7 +146,7 @@ void specific_test(void)
 		pr_err("0 valid blocks, no blocks allocated!");
 	mem_dump();
 	// free some rand blks:
-	pr_info("freeing rand blocks");
+	pr_info("freeing some blocks");
 	free_blk(3);
 	free_blk(4);
 	free_blk(5);
@@ -158,10 +158,9 @@ void specific_test(void)
 	//mem_dump();
 	// realloc some rand blks:
 	pr_info("Reallocating some blks");
-
-	realloc_blk(1);
-	realloc_blk(2);
-	realloc_blk(0);
+	for(int i=0; i<NBLOCKS; i++) {
+		realloc_blk(i);
+	}
 	mem_dump();
 	pr_blks();
 	pr_info("freeing all blks");
