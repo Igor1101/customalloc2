@@ -37,7 +37,7 @@ static bool init_pg_multiblk(int pgnum, size_t size);
 /*
  * init pgs with huge blk
  */
-static bool init_pgs_singleblk(int pgnum, size_t size);
+static bool init_pgs_singleblk(int pgnum, pg_t pgex);
 /*
  * returns first free blk, if not found return is NULL
  */
@@ -174,6 +174,30 @@ static bool init_pg_multiblk(int pgnum, size_t size)
 	return true;
 }
 /*
+ * init pgs with huge blk
+ */
+static bool init_pgs_singleblk(int pgnum, pg_t pgex)
+{
+	for(int i=pgnum; i<pgnum+pgex.blkinfo.pgsamount; i++) {
+		if(i >= PG_AMOUNT) {
+			pr_err("init_pgs_singleblk() out of memory");
+			return false;
+		}
+		if(pgs[i].st != pg_free) {
+			pr_err("init_pgs_singleblk() requested pg nonfree");
+			return false;
+		}
+	}
+	pgs[pgnum] = pgex;
+	pgs[pgnum].firstfreeblk = NULL;
+	// fill other pages
+	for(int i=pgnum; i<pgnum+pgex.blkinfo.pgsamount; i++) {
+		pgs[i].st = pg_sintermediate;
+	}
+	pgs[pgnum].st = pg_singleblk;
+	return true;
+}
+/*
  * returns first free blk, if not found return is NULL
  */
 static blk_t* get_freeblk_pg(int pgnum)
@@ -245,13 +269,7 @@ static void* alloc_singleblk(pg_t pg)
 	blk_t*b = (blk_t*)&array[pgstart*PG_SIZE];
 	b->busy = true;
 	b->nxtblk = PG_SIZE*pg.blkinfo.pgsamount;
-	pgs[pgstart] = pg;
-	pgs[pgstart].firstfreeblk = NULL;
-	// fill other pages
-	for(int i=pgstart; i<pgstart+pg.blkinfo.pgsamount; i++) {
-		pgs[i].st = pg_sintermediate;
-	}
-	pgs[pgstart].st = pg_singleblk;
+	assert(init_pgs_singleblk(pgstart, pg));
 	return BLK_START(b);
 }
 void *mem_alloc(size_t size)
