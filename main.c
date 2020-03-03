@@ -28,9 +28,9 @@ void alloc_blks(void)
 		if(blks[i].valid == false) {
 			size_t sz = (i%3+1)*NBYTES;
 			if(i==1)
-				sz = 1024*2;
+				sz = 1000*2;
 			if(i==2)
-				sz = 1024*2;
+				sz = 1000*2;
 			blks[i].addr = mem_alloc(sz);
 			blks[i].size = sz;
 			// set validity
@@ -54,10 +54,10 @@ void realloc_blk(int num)
 	if(blks[num].valid == false)
 		return;
 	int size_before = blks[num].size;
-	void*addr = mem_realloc(blks[num].addr, NBYTES_REALLOC);
+	void*addr = mem_realloc(blks[num].addr, size_before*2);
 	if(addr != NULL) {
 		blks[num].addr = addr;
-		blks[num].size = NBYTES_REALLOC;
+		blks[num].size = size_before*2;
 		if(size_before < blks[num].size) {
 			if(crc32(0, blks[num].addr, size_before) != blks[num].chksum) {
 				pr_err("CRC err, blk=%d", num);

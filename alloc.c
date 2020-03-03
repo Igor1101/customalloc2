@@ -60,8 +60,7 @@ static void* alloc_singleblk(pg_t pg);
 static void free_single(blk_t*b, int pg);
 static void free_multiple(blk_t*b, int pg);
 // realloc
-static void* realloc_multiblk(int pg, blk_t*blk, size_t size);
-static void* realloc_singleblk(int pg, blk_t*blk, size_t size);
+static void* realloc_universal(int pg, blk_t*blk, size_t size);
 /************end  local functions*******************/
 
 /*
@@ -345,15 +344,14 @@ void *mem_realloc(void *addr, size_t size)
 	}
 	switch(pgs[pg].st) {
 	case pg_multiblk:
-		return realloc_multiblk(pg, b, size);
 	case pg_singleblk:
-		return realloc_singleblk(pg, b, size);
+		return realloc_universal(pg, b, size);
 	default:
 		return NULL;
 	}
 }
 
-static void* realloc_multiblk(int pg, blk_t*blk, size_t size)
+static void* realloc_universal(int pg, blk_t*blk, size_t size)
 {
 	if(blk->nxtblk >= size) {
 		// nothing to do
@@ -371,14 +369,6 @@ static void* realloc_multiblk(int pg, blk_t*blk, size_t size)
 	return newaddr;
 }
 
-static void* realloc_singleblk(int pg, blk_t*blk, size_t size)
-{
-	if(blk->nxtblk >= size) {
-		// nothing to do
-		return BLK_START(blk);
-	}
-	return NULL;
-}
 void mem_free(void *addr)
 {
 	int pg = get_pg_region(addr);
